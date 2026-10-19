@@ -374,6 +374,12 @@
   }
   .h-tl-photo img{ width:100%; height:100%; object-fit:cover; display:block; }
   .h-tl-photo svg{ width:30px; height:30px; }
+  .h-tl-photo.h-tl-tbc{ background:none; border:none; }
+  .h-tl-tbc span{
+    font-family:'Cormorant Garamond', 'Playfair Display', Georgia, serif; font-style:italic;
+    font-size:21px; line-height:1.25; letter-spacing:0.02em; text-align:center; color:var(--ink-soft);
+  }
+  .h-tl-tbc em{ font-style:normal; display:block; color:var(--stamp); letter-spacing:0.2em; margin-top:4px; }
 
   /* ================= hero photo ================= */
   .hero-photo{
@@ -688,7 +694,7 @@
   .stepper .count{ width:56px; text-align:center; font-family:'Work Sans', sans-serif; font-size:16px; font-weight:600; font-variant-numeric: tabular-nums; }
 
   .conditional{ overflow:hidden; max-height:0; opacity:0; transition:max-height 0.35s ease, opacity 0.3s ease; }
-  .conditional.open{ max-height:400px; opacity:1; }
+  .conditional.open{ max-height:900px; opacity:1; }
   .conditional-inner{ display:flex; flex-direction:column; gap:22px; padding-top:4px; }
 
   .submit-btn{
@@ -1031,6 +1037,16 @@
             <p class="h-tl-caption">we made it&nbsp;official</p>
           </div>
         </div>
+        <div class="h-tl-item">
+          <div class="h-tl-upper">
+            <div class="h-tl-photo h-tl-tbc"><span>to be<br>continued<em>…</em></span></div>
+          </div>
+          <div class="h-tl-dot" aria-hidden="true"></div>
+          <div class="h-tl-lower">
+            <p class="h-tl-date">2027.01.17</p>
+            <p class="h-tl-caption">our wedding day</p>
+          </div>
+        </div>
       </div>
       </div>
     </div>
@@ -1184,6 +1200,21 @@
               <div class="pillrow" id="mealGroup" role="group" aria-label="餐點偏好">
                 <div class="pill" data-value="meat" role="button" tabindex="0" aria-pressed="false">葷食</div>
                 <div class="pill" data-value="veg" role="button" tabindex="0" aria-pressed="false">素食</div>
+              </div>
+            </div>
+            <div class="field">
+              <label>喜帖形式</label>
+              <div class="pillrow" id="inviteGroup" role="group" aria-label="喜帖形式">
+                <div class="pill" data-value="paper" role="button" tabindex="0" aria-pressed="false">紙本喜帖</div>
+                <div class="pill" data-value="digital" role="button" tabindex="0" aria-pressed="false">電子喜帖</div>
+              </div>
+              <p class="error-text" id="inviteError">請選擇喜帖形式</p>
+            </div>
+            <div class="conditional" id="paperExtra">
+              <div class="field">
+                <label for="address">紙本喜帖寄送地址</label>
+                <input type="text" id="address" name="address" autocomplete="street-address" placeholder="請輸入郵遞區號與完整地址">
+                <p class="error-text" id="addressError">請填寫寄送地址</p>
               </div>
             </div>
           </div>
@@ -1453,6 +1484,14 @@
     attendingExtra.classList.toggle('open', val === 'yes');
   });
   var mealGroup = setupPillGroup(document.getElementById('mealGroup'), function(){});
+  var paperExtra = document.getElementById('paperExtra');
+  var inviteGroup = setupPillGroup(document.getElementById('inviteGroup'), function(val){
+    paperExtra.classList.toggle('open', val === 'paper');
+    document.getElementById('inviteError').classList.remove('show');
+  });
+  document.getElementById('address').addEventListener('input', function(){
+    if (this.value.trim()) document.getElementById('addressError').classList.remove('show');
+  });
 
   var guestCount = 1, MAX_GUESTS = 8;
   var countEl = document.getElementById('guestCount');
@@ -1479,11 +1518,23 @@
     nameError.classList.remove('show');
 
     var attending = attendGroup.get() || 'yes';
+    var invite = inviteGroup.get();
+    var addressInput = document.getElementById('address');
+    var address = addressInput.value.trim();
+    var inviteError = document.getElementById('inviteError');
+    var addressError = document.getElementById('addressError');
+    inviteError.classList.remove('show'); addressError.classList.remove('show');
+    if (attending === 'yes'){
+      if (!invite){ inviteError.classList.add('show'); inviteError.scrollIntoView({behavior:'smooth', block:'center'}); return; }
+      if (invite === 'paper' && !address){ addressError.classList.add('show'); addressInput.focus(); return; }
+    }
     var payload = {
       name: name,
       attending: attending === 'yes' ? '出席' : '無法出席',
       count: attending === 'yes' ? guestCount : 0,
       meal: attending === 'yes' ? (mealGroup.get() === 'veg' ? '素食' : '葷食') : '',
+      invitation: attending === 'yes' ? (invite === 'paper' ? '紙本喜帖' : '電子喜帖') : '',
+      address: (attending === 'yes' && invite === 'paper') ? address : '',
       message: document.getElementById('message').value.trim(),
       submittedAt: new Date().toISOString()
     };
