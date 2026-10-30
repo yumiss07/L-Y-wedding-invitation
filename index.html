@@ -705,6 +705,7 @@
   .submit-btn:disabled{ opacity:0.5; cursor:wait; }
 
   .hint{ font-size:12px; color:var(--ink-faint); margin:2px 0 0; }
+  .invite-note{ margin-top:10px; }
   .error-text{ font-size:12px; color:var(--danger); margin:8px 0 0; display:none; }
   .error-text.show{ display:block; }
 
@@ -1178,6 +1179,15 @@
         </div>
 
         <div class="field">
+          <label>親友類別</label>
+          <div class="pillrow" id="sideGroup" role="group" aria-label="親友類別">
+            <div class="pill" data-value="groom" role="button" tabindex="0" aria-pressed="false">男方親友</div>
+            <div class="pill" data-value="bride" role="button" tabindex="0" aria-pressed="false">女方親友</div>
+          </div>
+          <p class="error-text" id="sideError">請選擇親友類別</p>
+        </div>
+
+        <div class="field">
           <label>是否出席</label>
           <div class="pillrow" id="attendGroup" role="group" aria-label="是否出席">
             <div class="pill" data-value="yes" role="button" tabindex="0" aria-pressed="false">我會出席</div>
@@ -1208,6 +1218,7 @@
                 <div class="pill" data-value="paper" role="button" tabindex="0" aria-pressed="false">紙本喜帖</div>
                 <div class="pill" data-value="digital" role="button" tabindex="0" aria-pressed="false">電子喜帖</div>
               </div>
+              <p class="hint invite-note">喜帖將於婚禮前一個月陸續發送</p>
               <p class="error-text" id="inviteError">請選擇喜帖形式</p>
             </div>
             <div class="conditional" id="paperExtra">
@@ -1484,6 +1495,9 @@
     attendingExtra.classList.toggle('open', val === 'yes');
   });
   var mealGroup = setupPillGroup(document.getElementById('mealGroup'), function(){});
+  var sideGroup = setupPillGroup(document.getElementById('sideGroup'), function(){
+    document.getElementById('sideError').classList.remove('show');
+  });
   var paperExtra = document.getElementById('paperExtra');
   var inviteGroup = setupPillGroup(document.getElementById('inviteGroup'), function(val){
     paperExtra.classList.toggle('open', val === 'paper');
@@ -1517,6 +1531,10 @@
     if (!name){ nameError.classList.add('show'); nameInput.focus(); return; }
     nameError.classList.remove('show');
 
+    var side = sideGroup.get();
+    var sideError = document.getElementById('sideError');
+    if (!side){ sideError.classList.add('show'); sideError.scrollIntoView({behavior:'smooth', block:'center'}); return; }
+    sideError.classList.remove('show');
     var attending = attendGroup.get() || 'yes';
     var invite = inviteGroup.get();
     var addressInput = document.getElementById('address');
@@ -1530,6 +1548,7 @@
     }
     var payload = {
       name: name,
+      side: side === 'groom' ? '男方親友' : '女方親友',
       attending: attending === 'yes' ? '出席' : '無法出席',
       count: attending === 'yes' ? guestCount : 0,
       meal: attending === 'yes' ? (mealGroup.get() === 'veg' ? '素食' : '葷食') : '',
