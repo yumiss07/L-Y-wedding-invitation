@@ -691,6 +691,9 @@
   .stepper button:first-child{ border-right:1px solid var(--line-strong); }
   .stepper button:last-child{ border-left:1px solid var(--line-strong); }
   .stepper button:disabled{ color:var(--ink-faint); cursor:not-allowed; }
+  .meal-split{ display:flex; gap:16px; flex-wrap:wrap; }
+  .meal-item{ display:flex; flex-direction:column; gap:6px; }
+  .meal-name{ font-size:13px; color:var(--ink-soft); }
   .stepper .count{ width:56px; text-align:center; font-family:'Work Sans', sans-serif; font-size:16px; font-weight:600; font-variant-numeric: tabular-nums; }
 
   .conditional{ overflow:hidden; max-height:0; opacity:0; transition:max-height 0.35s ease, opacity 0.3s ease; }
@@ -1206,10 +1209,32 @@
               </div>
             </div>
             <div class="field">
-              <label>餐點偏好</label>
-              <div class="pillrow" id="mealGroup" role="group" aria-label="餐點偏好">
-                <div class="pill" data-value="meat" role="button" tabindex="0" aria-pressed="false">葷食</div>
-                <div class="pill" data-value="veg" role="button" tabindex="0" aria-pressed="false">素食</div>
+              <label>餐點（葷食＋素食＝出席人數）</label>
+              <div class="meal-split">
+                <div class="meal-item">
+                  <span class="meal-name">葷食</span>
+                  <div class="stepper">
+                    <button type="button" id="meatMinus" aria-label="減少葷食人數">－</button>
+                    <span class="count" id="meatCount">1</span>
+                    <button type="button" id="meatPlus" aria-label="增加葷食人數">＋</button>
+                  </div>
+                </div>
+                <div class="meal-item">
+                  <span class="meal-name">素食</span>
+                  <div class="stepper">
+                    <button type="button" id="vegMinus" aria-label="減少素食人數">－</button>
+                    <span class="count" id="vegCount">0</span>
+                    <button type="button" id="vegPlus" aria-label="增加素食人數">＋</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="field">
+              <label>兒童椅（不需要請維持 0）</label>
+              <div class="stepper">
+                <button type="button" id="chairMinus" aria-label="減少兒童椅">－</button>
+                <span class="count" id="chairCount">0</span>
+                <button type="button" id="chairPlus" aria-label="增加兒童椅">＋</button>
               </div>
             </div>
             <div class="field">
@@ -1494,7 +1519,6 @@
   var attendGroup = setupPillGroup(document.getElementById('attendGroup'), function(val){
     attendingExtra.classList.toggle('open', val === 'yes');
   });
-  var mealGroup = setupPillGroup(document.getElementById('mealGroup'), function(){});
   var sideGroup = setupPillGroup(document.getElementById('sideGroup'), function(){
     document.getElementById('sideError').classList.remove('show');
   });
@@ -1510,10 +1534,32 @@
   var guestCount = 1, MAX_GUESTS = 8;
   var countEl = document.getElementById('guestCount');
   var minusBtn = document.getElementById('minusBtn'), plusBtn = document.getElementById('plusBtn');
+  var vegCount = 0, chairCount = 0;
+  var meatEl = document.getElementById('meatCount'), vegEl = document.getElementById('vegCount'), chairEl = document.getElementById('chairCount');
+  var meatMinus = document.getElementById('meatMinus'), meatPlus = document.getElementById('meatPlus');
+  var vegMinus = document.getElementById('vegMinus'), vegPlus = document.getElementById('vegPlus');
+  var chairMinus = document.getElementById('chairMinus'), chairPlus = document.getElementById('chairPlus');
+  // 葷＋素永遠等於出席人數：調整其中一邊，另一邊自動補足
+  function renderMeal(){
+    if (vegCount > guestCount) vegCount = guestCount;
+    if (chairCount > guestCount) chairCount = guestCount;
+    var meat = guestCount - vegCount;
+    meatEl.textContent = String(meat); vegEl.textContent = String(vegCount); chairEl.textContent = String(chairCount);
+    meatMinus.disabled = meat <= 0; meatPlus.disabled = vegCount <= 0;
+    vegMinus.disabled = vegCount <= 0; vegPlus.disabled = vegCount >= guestCount;
+    chairMinus.disabled = chairCount <= 0; chairPlus.disabled = chairCount >= guestCount;
+  }
+  meatMinus.addEventListener('click', function(){ if (vegCount < guestCount){ vegCount++; renderMeal(); } });
+  meatPlus.addEventListener('click', function(){ if (vegCount > 0){ vegCount--; renderMeal(); } });
+  vegMinus.addEventListener('click', function(){ if (vegCount > 0){ vegCount--; renderMeal(); } });
+  vegPlus.addEventListener('click', function(){ if (vegCount < guestCount){ vegCount++; renderMeal(); } });
+  chairMinus.addEventListener('click', function(){ if (chairCount > 0){ chairCount--; renderMeal(); } });
+  chairPlus.addEventListener('click', function(){ if (chairCount < guestCount){ chairCount++; renderMeal(); } });
   function renderCount(){
     countEl.textContent = String(guestCount);
     minusBtn.disabled = guestCount <= 1;
     plusBtn.disabled = guestCount >= MAX_GUESTS;
+    renderMeal();
   }
   minusBtn.addEventListener('click', function(){ if(guestCount>1){ guestCount--; renderCount(); } });
   plusBtn.addEventListener('click', function(){ if(guestCount<MAX_GUESTS){ guestCount++; renderCount(); } });
@@ -1551,7 +1597,9 @@
       side: side === 'groom' ? '男方親友' : '女方親友',
       attending: attending === 'yes' ? '出席' : '無法出席',
       count: attending === 'yes' ? guestCount : 0,
-      meal: attending === 'yes' ? (mealGroup.get() === 'veg' ? '素食' : '葷食') : '',
+      meatCount: attending === 'yes' ? (guestCount - vegCount) : '',
+      vegCount: attending === 'yes' ? vegCount : '',
+      childSeats: attending === 'yes' ? chairCount : '',
       invitation: attending === 'yes' ? (invite === 'paper' ? '紙本喜帖' : '電子喜帖') : '',
       address: (attending === 'yes' && invite === 'paper') ? address : '',
       message: document.getElementById('message').value.trim(),
