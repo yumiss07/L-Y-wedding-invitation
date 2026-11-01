@@ -1633,8 +1633,9 @@
   bgmToggle.addEventListener('click', function(){
     if (!bgmAudio) return;
     if (bgmAudio.paused){
+      if (bgmAudioCtx && bgmAudioCtx.state !== 'running' && bgmAudioCtx.state !== 'suspended'){ rebuildBgm(); }
       ensureBgmGraph();
-      if (bgmAudioCtx && bgmAudioCtx.state === 'suspended'){ bgmAudioCtx.resume(); }
+      if (bgmAudioCtx && bgmAudioCtx.state !== 'running'){ bgmAudioCtx.resume(); }
       bgmAudio.play().then(function(){
         fadeInBgm(bgmAudio, 1200);
         bgmToggle.setAttribute('aria-pressed', 'true');
@@ -1649,7 +1650,44 @@
     }
   });
 
-  // 切到別的 App／分頁時自動暫停音樂，切回網頁時（如果原本正在播放）才自動恢復播放
+  // iPhone（Safari／LINE 內建瀏覽器）切到別的 App 再回來時，Web Audio 常會被系統「中斷」，
+  // 回來後取樣率可能被改掉，音樂就會變調、變快或變慢。
+  // 解法：離開時暫停並收起 AudioContext；回來時換一個全新的 <audio> 與 AudioContext，從原本的秒數接著播。
+  function attachBgmListeners(el){
+    el.addEventListener('timeupdate', updateBgmProgress);
+    el.addEventListener('seeked', updateBgmProgress);
+  }
+  function rebuildBgm(){
+    if (!bgmAudio) return;
+    var t = bgmAudio.currentTime || 0;
+    try { bgmAudio.pause(); } catch(e){}
+    var fresh = bgmAudio.cloneNode(false);
+    bgmAudio.parentNode.replaceChild(fresh, bgmAudio);
+    try { if (bgmAudioCtx && bgmAudioCtx.close) bgmAudioCtx.close(); } catch(e){}
+    bgmAudioCtx = null; bgmGainNode = null;
+    bgmAudio = fresh;
+    attachBgmListeners(bgmAudio);
+    try { bgmAudio.currentTime = t; } catch(e){}
+    bgmAudio.addEventListener('loadedmetadata', function(){
+      if (Math.abs(bgmAudio.currentTime - t) > 1){ try { bgmAudio.currentTime = t; } catch(e){} }
+    }, { once:true });
+  }
+  function showBgmPaused(){
+    if (bgmAudio && !bgmAudio.paused){ try { bgmAudio.pause(); } catch(e){} }
+    bgmToggle.setAttribute('aria-pressed', 'false');
+    bgmToggle.setAttribute('aria-label', '播放背景音樂');
+    bgmPlayer.classList.add('paused');
+  }
+  function resumeCtx(){
+    if (!bgmAudioCtx) return Promise.resolve();
+    var r;
+    try { r = bgmAudioCtx.resume(); } catch(e){ r = null; }
+    // iOS 沒有使用者點擊時，resume() 可能一直不回應，最多等 800ms
+    return Promise.race([Promise.resolve(r), new Promise(function(res){ setTimeout(res, 800); })]).then(function(){
+      if (bgmAudioCtx && bgmAudioCtx.state !== 'running') throw new Error('ctx-not-running');
+    });
+  }
+
   var bgmPausedByVisibility = false;
   document.addEventListener('visibilitychange', function(){
     if (!bgmAudio) return;
@@ -1658,11 +1696,20 @@
         bgmAudio.pause();
         bgmPausedByVisibility = true;
       }
+      try { if (bgmAudioCtx && bgmAudioCtx.state === 'running') bgmAudioCtx.suspend(); } catch(e){}
     } else if (bgmPausedByVisibility){
       bgmPausedByVisibility = false;
-      if (bgmAudioCtx && bgmAudioCtx.state === 'suspended'){ bgmAudioCtx.resume(); }
-      var bgmResume = bgmAudio.play();
-      if (bgmResume && bgmResume.catch){ bgmResume.catch(function(){}); }
+      rebuildBgm();
+      ensureBgmGraph();
+      setBgmGain(0);
+      resumeCtx().then(function(){
+        return bgmAudio.play();
+      }).then(function(){
+        fadeInBgm(bgmAudio, 900);
+      }).catch(function(){
+        // 瀏覽器不允許自動恢復時，改成暫停狀態，賓客點一下播放鍵即可
+        showBgmPaused();
+      });
     }
   });
 
